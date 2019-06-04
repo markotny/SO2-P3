@@ -4,8 +4,6 @@
 #include <mutex>
 #include <thread>
 #include "easylogging++.h"
-#include "Resource.h"
-#include "Clock.h"
 #include "Person.h"
 
 INITIALIZE_EASYLOGGINGPP
@@ -22,7 +20,7 @@ Resource* resources[5];
 std::vector<Person*> *queue[5];   // queue for each resource
 Person* children[3];
 
-Clock* clock;
+Clock* main_clock;
 
 void init() {
     initscr();    // init ncurses on whole console
@@ -39,13 +37,15 @@ void init() {
 
 void time_flows(int interval_ms){
     while(!cancel){
-        clock->jump_in_time(60);
+        std::scoped_lock lk(main_clock->clk_mutex);
+        main_clock->jump_in_time(60);
         std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
     }
 }
 
 void stop_all() {
-    getch();
+    //getch();
+    getchar();
 
     LOG(INFO) << "stopping...";
     cancel = true;
@@ -54,41 +54,57 @@ void stop_all() {
 void live_a_life(Person* person){
     while(!cancel){
         if (person->state != idle){
+            LOG(INFO) << person->name << " is " << person->state << ", waiting until idle";
+
             std::unique_lock lk(person->permutex);
             person->percondition.wait(lk, [person] {
                 return person->state == idle || cancel == true;
             });
             lk.unlock();
         }
-        if (clock->hour >= 22 || clock->hour < 6){
+        LOG(INFO) << person->name << " ready for next task";
+
+        if (main_clock->hour >= 22 || main_clock->hour < 6){
             for (int i = 0; i < 5; i++){
                 if (!beds[i]->used){
                     person->resource_used = beds[i];
+                    beds[i]->used = true;
+                    LOG(INFO) << person->name << "going to bed " << i;
                     break;
                 }
             }
             person->sleep();
-        } else if (clock->hour >= 13 && clock->hour <= 18 && !person->used_kitchen){
+            LOG(INFO) << person->name << " woke up?";
+            
+
+        } else if (main_clock->hour >= 13 && main_clock->hour <= 18 && !person->used_kitchen){
             queue[0]->push_back(person);
+            LOG(INFO) << person->name << " going to kitchen";
+
             person->use(kitchen, std::rand() % 60, queue[0]);
+            person->used_kitchen = true;
+            LOG(INFO) << person->name << " done with kitchen?";
         } else {
             int res = std::rand() % 4 + 1;
             queue[res]->push_back(person);
+            LOG(INFO) << person->name << " going for resource " << res;
             person->use(resources[res], std::rand() % 60, queue[res]);
+            LOG(INFO) << person->name << " done with resource? " << res;
         }
     }
 }
 
 
 void house_setup(){
-    persons[0] = new Person("mama", clock);
-    persons[1] = new Person("tata", clock);
-    persons[2] = new Person("Igor", clock);
-    persons[3] = new Person("Irek", clock);
-    persons[4] = new Person("Iga", clock);
+    persons[0] = new Person("mama", main_clock);
+    persons[1] = new Person("tata", main_clock);
+    persons[2] = new Person("Igor", main_clock);
+    persons[3] = new Person("Irek", main_clock);
+    persons[4] = new Person("Iga", main_clock);
 
     for (int i = 0; i < 5; i++){
         beds[i] = new Resource(4, 1 + 2 * i);
+        queue[i] = new std::vector<Person*>();
     }
 
     kitchen = new Resource(40, 1, 2);
@@ -107,20 +123,22 @@ void house_setup(){
     children[1] = persons[3];
     children[2] = persons[4];
 
-    clock = new Clock(8, 0, 0);
+    main_clock = new Clock(8, 0, 0);
 }
 
 void delete_house(){
-    delete[] persons;
-    delete[] beds;
-    delete[] resources;
-    delete[] queue;
-    delete clock;
+    for (int i = 0; i < 5; i++){
+        delete persons[i];
+        delete beds[i];
+        delete resources[i];
+        delete queue[i];
+    }
+    delete main_clock;
 }
 int main() {
     std::srand(time(NULL));
     el::Configurations conf("log/easylogging.conf");
-    conf.set(el::Level::Global, el::ConfigurationType::Enabled, "true");
+    conf.set(el::Level::Global, el::ConfigurationType::Enabled, "false");
     
     el::Loggers::reconfigureLogger("default", conf);
 
@@ -134,6 +152,7 @@ int main() {
     for (int i = 0; i < 5; i++){
         ppl_threads[i] = std::thread(live_a_life, persons[i]);
     }
+    LOG(INFO) << "Started all threads.";
 
     std::thread(stop_all).join();
 

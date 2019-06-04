@@ -11,7 +11,8 @@
                 "-o",
                 "prg",
                 "main.cpp",
-                "Dot.cpp",
+                "Clock.cpp",
+                "Person.cpp",
                 "easylogging++.cc",
                 "-pthread",
                 "-lncurses"

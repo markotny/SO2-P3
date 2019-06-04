@@ -1,4 +1,4 @@
-#include <stdlib.h>
+#include <mutex>
 
 class Clock {
 
@@ -7,6 +7,8 @@ public:
     int minute;
     int second;
     
+    std::mutex clk_mutex;
+
     Clock(int h = 0, int m = 0, int s = 0)
     : hour(h), minute(m), second(s)
     {}

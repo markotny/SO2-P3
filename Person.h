@@ -20,14 +20,14 @@ public:
     bool used_kitchen;
     int x,y;
 
-    Clock* clock;
+    Clock* main_clock;
     std::mutex permutex;
     std::condition_variable percondition;
     
     Person(std::string n, Clock* cl){
-        clock = cl;
+        main_clock = cl;
         name = n;
-        state = moving;
+        state = idle;
         used_kitchen = false;
     }
 
@@ -39,4 +39,5 @@ private:
     int steps_all, steps_left, start_x, start_y, dest_x, dest_y, vec_x, vec_y;
     void move_to_resource_used(int queue_size);
     void keep_on_movin();
+    int get_time();
 };
