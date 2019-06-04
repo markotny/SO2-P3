@@ -3,18 +3,46 @@
 #include <thread>
 
 
+
 void Person::sleep(){
     move_to_resource_used(1);
     //wait on conditional variable...
 }
 
-void Person::use(Resource* res, int queue_size){
+void Person::use(Resource* res, int duration_minutes, std::vector<Person*> * queue){
     resource_used = res;
-    move_to_resource_used(queue_size);
+    state = moving;
+    move_to_resource_used(queue->size);
+
+    state = waiting;
+    int position_in_queue = queue->size - 1;
+
+    while (position_in_queue >= res->capacity){
+        Person * pers = queue->at(position_in_queue - 1); // lock on previous guy in line
+
+        std::unique_lock lk(pers->permutex);
+        pers->percondition.wait(lk, [pers] {
+            return pers->state == idle;
+        });
+        position_in_queue--;
+        lk.unlock();
+    }
+
+    state = using_resource;
+    int start = clock->now();
+    while (clock->now() - start < duration_minutes * 60){
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    {
+        std::scoped_lock lk(permutex);
+        state = idle;
+        resource_used = nullptr;
+        queue->erase(queue->begin() + position_in_queue);
+    }
+    percondition.notify_all();
 }
 
 void Person::move_to_resource_used(int queue_size){
-    state = moving;
     start_x = x;
     start_y = y;
     dest_x = resource_used->x - 2 * queue_size;
@@ -23,12 +51,10 @@ void Person::move_to_resource_used(int queue_size){
     vec_y = dest_y - y;
     steps_left = sqrt(pow(vec_x, 2) + pow(vec_y, 2));
     steps_all = steps_left;
-    std::thread(make_a_move).join();
-    if (queue_size > resource_used->capacity)
-        state = waiting;
+    keep_on_movin();
 }
 
-void Person::make_a_move(){
+void Person::keep_on_movin(){
     while (steps_left > 0){
         x = start_x + vec_x * (steps_all - steps_left);
         y = start_y + vec_y * (steps_all - steps_left);
