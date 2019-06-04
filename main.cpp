@@ -56,6 +56,7 @@ void stop_all() {
 
 void live_a_life(Person* person){
     while(!cancel){
+        //wait on conditional unil person finished doing whatever they were doing
         if (clock.hour >= 22 || clock.hour < 6){
             for (int i = 0; i < 5; i++){
                 if (!beds[i].used){
@@ -64,43 +65,34 @@ void live_a_life(Person* person){
                 }
             }
             person->sleep();
-            //wait on conditional variable for wakeup
+        } else if (clock.hour >= 13 && clock.hour <= 18 && !person->used_kitchen){
+            queue[0].push_back(person);
+            person->use(&kitchen, queue[0].size);
         } else {
-
+            int res = std::rand() % 4 + 1;
+            queue[res].push_back(person);
+            person->use(resources[res], queue[res].size);
         }
     }
 }
 
 
 void house_setup(){
-    persons[0].name = "mama";
-    persons[1].name = "tata";
-    persons[2].name = "Igor";
-    persons[3].name = "Irek";
-    persons[4].name = "Iga";
+    persons[0] = Person("mama");
+    persons[1] = Person("tata");
+    persons[2] = Person("Igor");
+    persons[3] = Person("Irek");
+    persons[4] = Person("Iga");
 
     for (int i = 0; i < 5; i++){
-        beds[i].x = 4;
-        beds[i].y = 1 + 2 * i;
+        beds[i] = Resource(4, 1 + 2 * i);
     }
 
-    kitchen.x = 40;
-    kitchen.y = 1;
-    kitchen.capacity = 2;
-
-    bathroom.x = 40;
-    bathroom.y = 3;
-
-    computer.x = 40;
-    computer.y = 5;
-
-    tv.x = 40;
-    tv.y = 7;
-    tv.capacity = 3;
-
-    console.x = 40;
-    console.y = 9;
-    console.capacity = 2;
+    kitchen = Resource(40, 1, 2);
+    bathroom = Resource(40, 3);
+    computer = Resource(40, 5);
+    tv = Resource(40, 7, 3);
+    console = Resource(40, 9, 2);
 
     resources[0] = &kitchen;
     resources[1] = &bathroom;
@@ -112,16 +104,14 @@ void house_setup(){
     children[1] = &persons[3];
     children[2] = &persons[4];
 
-    clock.hour = 8;
-    clock.minute = 0;
-    clock.second = 0;
+    clock = Clock(8, 0, 0);
 
     for (int i = 0; i < 5; i++){
         int res = std::rand() % 5;
         persons[i].resource_used = resources[res];
         queue[res].push_back(&persons[i]);
 
-        persons[i].move_to_resource_used(queue[res].size);
+        persons[i].use(resources[res], queue[res].size);
     }
 }
 int main() {

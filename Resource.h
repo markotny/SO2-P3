@@ -4,8 +4,8 @@ public:
     bool used;
     int capacity;
     int x,y;
-    Resource(){
+    Resource(int iks, int igrek, int cap = 1)
+    : x(iks), y(igrek), capacity(cap) {
         used = false;
-        capacity = 1;
     }
 };

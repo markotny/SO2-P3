@@ -8,6 +8,10 @@ void Person::sleep(){
     //wait on conditional variable...
 }
 
+void Person::use(Resource* res, int queue_size){
+    resource_used = res;
+    move_to_resource_used(queue_size);
+}
 
 void Person::move_to_resource_used(int queue_size){
     state = moving;
