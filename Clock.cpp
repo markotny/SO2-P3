@@ -1,6 +1,6 @@
-#include "Time.h"
+#include "Clock.h"
 
-void Time::jump_in_time(int sec){
+void Clock::jump_in_time(int sec){
     second += sec;
     if (second >= 60){
         minute += second / 60;
@@ -15,6 +15,6 @@ void Time::jump_in_time(int sec){
     }
 }
 
-int Time::now(){
+int Clock::now(){
     return second + minute * 60 + hour * 3600;
 }
