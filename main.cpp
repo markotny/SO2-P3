@@ -96,6 +96,8 @@ void live_a_life(Person* person){
 
 
 void house_setup(){
+    main_clock = new Clock(8, 0, 0);
+
     persons[0] = new Person("mama", main_clock);
     persons[1] = new Person("tata", main_clock);
     persons[2] = new Person("Igor", main_clock);
@@ -123,7 +125,6 @@ void house_setup(){
     children[1] = persons[3];
     children[2] = persons[4];
 
-    main_clock = new Clock(8, 0, 0);
 }
 
 void delete_house(){

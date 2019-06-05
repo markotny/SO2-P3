@@ -39,5 +39,4 @@ private:
     int steps_all, steps_left, start_x, start_y, dest_x, dest_y, vec_x, vec_y;
     void move_to_resource_used(int queue_size);
     void keep_on_movin();
-    int get_time();
 };

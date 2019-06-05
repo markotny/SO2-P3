@@ -17,6 +17,5 @@ void Clock::jump_in_time(int sec){
 }
 
 int Clock::now(){
-    std::cout<< "time: " << hour << ":" << minute << ":" << second << std::endl;
     return second + minute * 60 + hour * 3600;
 }

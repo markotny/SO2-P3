@@ -36,8 +36,8 @@ void Person::use(Resource* res, int duration_minutes, std::vector<Person*> * que
 
     std::cout<< name << " starting to use resource\n";
     state = using_resource;
-    int start = get_time();
-    while (get_time() - start < duration_minutes * 60){
+    int start = main_clock->now();
+    while (main_clock->now() - start < duration_minutes * 60){
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     std::cout<< name << " stopped using resource\n";
@@ -70,9 +70,4 @@ void Person::keep_on_movin(){
     }
     x = dest_x;
     y = dest_y;
-}
-
-int Person::get_time() {
-    std::scoped_lock lk(main_clock->clk_mutex);
-    return main_clock->now();
 }
