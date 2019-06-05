@@ -28,7 +28,7 @@ void init() {
     timeout(-1);  // blocking getch()
 
     getmaxyx(stdscr, terminal_height, terminal_width);
-    LOG(INFO) << "Started on terminal width x height: " << terminal_width
+    std::cout << "Started on terminal width x height: " << terminal_width
               << " x " << terminal_height;
 
     clear();
@@ -47,14 +47,14 @@ void stop_all() {
     //getch();
     getchar();
 
-    LOG(INFO) << "stopping...";
+    std::cout << "stopping...";
     cancel = true;
 }
 
 void live_a_life(Person* person){
     while(!cancel){
         if (person->state != idle){
-            LOG(INFO) << person->name << " is " << person->state << ", waiting until idle";
+            std::cout << person->name << " is " << person->state << ", waiting until idle" << std::endl;
 
             std::unique_lock lk(person->permutex);
             person->percondition.wait(lk, [person] {
@@ -62,34 +62,34 @@ void live_a_life(Person* person){
             });
             lk.unlock();
         }
-        LOG(INFO) << person->name << " ready for next task";
+        std::cout << person->name << " ready for next task" << std::endl;
 
         if (main_clock->hour >= 22 || main_clock->hour < 6){
             for (int i = 0; i < 5; i++){
                 if (!beds[i]->used){
                     person->resource_used = beds[i];
                     beds[i]->used = true;
-                    LOG(INFO) << person->name << "going to bed " << i;
+                    std::cout << person->name << "going to bed " << i << std::endl;
                     break;
                 }
             }
             person->sleep();
-            LOG(INFO) << person->name << " woke up?";
+            std::cout << person->name << " woke up" << std::endl;
             
 
         } else if (main_clock->hour >= 13 && main_clock->hour <= 18 && !person->used_kitchen){
             queue[0]->push_back(person);
-            LOG(INFO) << person->name << " going to kitchen";
+            std::cout << person->name << " going to kitchen" << std::endl;
 
             person->use(kitchen, std::rand() % 60, queue[0]);
             person->used_kitchen = true;
-            LOG(INFO) << person->name << " done with kitchen?";
+            std::cout << person->name << " done with kitchen" << std::endl;
         } else {
             int res = std::rand() % 4 + 1;
             queue[res]->push_back(person);
-            LOG(INFO) << person->name << " going for resource " << res;
+            std::cout << person->name << " going for resource " << res << std::endl;
             person->use(resources[res], std::rand() % 60, queue[res]);
-            LOG(INFO) << person->name << " done with resource? " << res;
+            std::cout << person->name << " done with resource " << res << std::endl;
         }
     }
 }
@@ -153,7 +153,7 @@ int main() {
     for (int i = 0; i < 5; i++){
         ppl_threads[i] = std::thread(live_a_life, persons[i]);
     }
-    LOG(INFO) << "Started all threads.";
+    std::cout << "Started all threads.\n";
 
     std::thread(stop_all).join();
 

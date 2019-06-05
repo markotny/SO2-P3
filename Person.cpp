@@ -40,7 +40,6 @@ void Person::use(Resource* res, int duration_minutes, std::vector<Person*> * que
     while (main_clock->now() - start < duration_minutes * 60){
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-    std::cout<< name << " stopped using resource\n";
     {
         std::scoped_lock lk(permutex);
         state = idle;
