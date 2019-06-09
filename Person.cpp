@@ -6,7 +6,7 @@
 
 void Person::sleep(){
     move_to_resource_used(1);
-    //wait on conditional variable...
+    //wait until the morning...
 }
 
 void Person::use(Resource* res, int duration_minutes, std::vector<Person*> * queue){

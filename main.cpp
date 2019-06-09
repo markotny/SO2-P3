@@ -53,17 +53,6 @@ void stop_all() {
 
 void live_a_life(Person* person){
     while(!cancel){
-        if (person->state != idle){
-            std::cout << person->name << " is " << person->state << ", waiting until idle" << std::endl;
-
-            std::unique_lock lk(person->permutex);
-            person->percondition.wait(lk, [person] {
-                return person->state == idle || cancel == true;
-            });
-            lk.unlock();
-        }
-        std::cout << person->name << " ready for next task" << std::endl;
-
         if (main_clock->hour >= 22 || main_clock->hour < 6){
             for (int i = 0; i < 5; i++){
                 if (!beds[i]->used){
