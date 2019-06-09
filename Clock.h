@@ -16,4 +16,6 @@ public:
     void jump_in_time(int sec);
 
     int now();
+
+    std::string print_time();
 };

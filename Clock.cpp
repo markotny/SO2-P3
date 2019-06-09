@@ -19,3 +19,7 @@ void Clock::jump_in_time(int sec){
 int Clock::now(){
     return second + minute * 60 + hour * 3600;
 }
+
+std::string Clock::print_time(){
+    return std::string(std::to_string(hour) + ":" + std::to_string(minute) + ":" + std::to_string(second) + " ");
+}
