@@ -14,50 +14,58 @@ void Person::sleep(){
 void Person::use(Resource* res, int duration_minutes, std::deque<Person*> * queue){
     resource_used = res;
     state = moving;
-    LOG(INFO)<< name << " starting to move\n";
+    print_state("moving to " + res->name);
 
     move_to_resource_used(queue->size());
 
     state = waiting;
-    int position_in_queue = queue->size() - 1;
 
-    LOG(INFO)<< name << " waiting in queue at " << position_in_queue << std::endl;
+    while (res->used_by >= res->capacity){
+        print_state ("waiting for " + res->name);
+        // lock on the resource
 
-    while (position_in_queue >= res->capacity){
-        Person * pers = queue->at(position_in_queue - 1); // lock on previous guy in line
-
-        std::unique_lock lk(pers->permutex);
-        pers->percondition.wait(lk, [pers] {
-            return pers->state == idle;
+        std::unique_lock lk(res->resmutex);
+        res->rescondition.wait(lk, [res] {
+            return res->used_by < res->capacity; //wait until next guy moves
         });
-        position_in_queue--;
-        reprint(x, y, x + 2, y);
-        x += 2;
-        LOG(INFO)<< name << " moved in line\n";
         lk.unlock();
     }
 
-    LOG(INFO)<< name << " starting to use resource\n";
+    print_state("using " + res->name + " 0%");
     state = using_resource;
-    {
-        std::scoped_lock lk (*print_mutex);
-        mvaddch(y,x, name.c_str()[0] | A_UNDERLINE);
-        refresh();
-    }
+    res->used_by++;
+    
     int start = main_clock->now();
-    while (main_clock->now() - start < duration_minutes * 60){
+    float progress = 0.0;
+    do {
+        {
+            std::scoped_lock lk (*print_mutex);
+            mvaddch(y,x, name.c_str()[0] | A_UNDERLINE);
+            refresh();
+        }
+        print_state("using " + res->name + " - " + std::to_string(int(100 * progress)) + "%");
+        progress = static_cast<float>(main_clock->now() - start) / (duration_minutes * 60);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
+    } while (progress < 1.0);
     {
-        std::scoped_lock lk(permutex);
+        std::scoped_lock lk(permutex, res->resmutex);
         state = idle;
         resource_used = nullptr;
-        queue->erase(queue->begin() + position_in_queue);
-
+        int i = 0;
+        for (; i < queue->size(); i++){
+            if (queue->at(i) == this)
+                break;
+        }
+        queue->erase(queue->begin() + i);
+        for (; i < queue->size(); i++){
+            queue->at(i)->move_in_line();
+        }
+        res->used_by--;
         reprint(x, y, x, y - 1);
         y -= 1;
     }
     percondition.notify_all();
+    res->rescondition.notify_all();
 }
 
 void Person::move_to_resource_used(int queue_size){
@@ -79,7 +87,7 @@ void Person::keep_on_movin(){
         reprint(x, y, xn, yn);
         x = xn;
         y = yn;
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         steps_left--;
     }
     reprint(x, y, dest_x, dest_y);
@@ -87,11 +95,25 @@ void Person::keep_on_movin(){
     y = dest_y;
 }
 
+void Person::move_in_line(){
+    reprint(x, y, x + 2, y);
+    x += 2;
+}
+
 void Person::reprint(int x_old, int y_old, int x_new, int y_new){
     std::scoped_lock lk (*print_mutex);
 
     mvprintw(y_old, x_old, " ");
     mvprintw(y_new, x_new, "%c", name.c_str()[0]);
+
+    refresh();
+}
+
+void Person::print_state(std::string state){
+    std::scoped_lock lk (*print_mutex);
+
+    mvprintw(state_line, 80, "%s: %s", name.c_str(), state.c_str());
+    clrtoeol();
 
     refresh();
 }

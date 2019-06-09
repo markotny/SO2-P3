@@ -37,6 +37,11 @@ void time_flows(int interval_ms){
     while(!cancel){
         std::scoped_lock lk(main_clock->clk_mutex);
         main_clock->jump_in_time(60);
+        {
+            std::scoped_lock loc(print_mutex);
+            mvprintw(1, 80, "Time: %s", main_clock->print_time().c_str());
+            refresh();
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
     }
 }
@@ -52,9 +57,9 @@ void live_a_life(Person* person){
     while(!cancel){
         if (main_clock->hour >= 22 || main_clock->hour < 6){
             for (int i = 0; i < 5; i++){
-                if (!beds[i]->used){
+                if (beds[i]->used_by == 0){
                     person->resource_used = beds[i];
-                    beds[i]->used = true;
+                    beds[i]->used_by++;
                     LOG(INFO) << person->name << "going to bed " << i << std::endl;
                     break;
                 }
@@ -67,14 +72,14 @@ void live_a_life(Person* person){
             queue[0]->push_back(person);
             LOG(INFO) << main_clock->print_time() << person->name << " going to kitchen" << std::endl;
 
-            person->use(kitchen, std::rand() % 60, queue[0]);
+            person->use(kitchen, 60 + std::rand() % 60, queue[0]);
             person->used_kitchen = true;
             LOG(INFO) << main_clock->print_time() << person->name << " done with kitchen" << std::endl;
         } else {
             int res = std::rand() % 4 + 1;
             queue[res]->push_back(person);
             LOG(INFO) << main_clock->print_time() << person->name << " going for resource " << res << std::endl;
-            person->use(resources[res], std::rand() % 60, queue[res]);
+            person->use(resources[res], 60 + std::rand() % 120, queue[res]);
             LOG(INFO) << main_clock->print_time() << person->name << " done with resource " << res << std::endl;
         }
     }
@@ -84,11 +89,11 @@ void live_a_life(Person* person){
 void house_setup(){
     main_clock = new Clock(8, 0, 0);
 
-    persons[0] = new Person("mama", main_clock, &print_mutex);
-    persons[1] = new Person("tata", main_clock, &print_mutex);
-    persons[2] = new Person("Janusz", main_clock, &print_mutex);
-    persons[3] = new Person("Marcin", main_clock, &print_mutex);
-    persons[4] = new Person("Kuba", main_clock, &print_mutex);
+    persons[0] = new Person("mama", 3, main_clock, &print_mutex);
+    persons[1] = new Person("tata", 4, main_clock, &print_mutex);
+    persons[2] = new Person("Janusz", 5, main_clock, &print_mutex);
+    persons[3] = new Person("Marcin", 6, main_clock, &print_mutex);
+    persons[4] = new Person("Kuba", 7, main_clock, &print_mutex);
 
     for (int i = 0; i < 5; i++){
         beds[i] = new Resource("bed", 4, 1 + 2 * i);
@@ -114,10 +119,17 @@ void house_setup(){
 }
 
 void print_house(){
-    std::scoped_lock lk (print_mutex);
-    for (int i = 0; i < 5; i++){
-        mvprintw(beds[i]->y, beds[i]->x, "bed%d", i);
-        mvprintw(resources[i]->y, resources[i]->x, "%s", resources[i]->name.c_str());
+    while (!cancel) {
+        {
+            std::scoped_lock lk(print_mutex);
+            for (int i = 0; i < 5; i++) {
+                mvprintw(beds[i]->y, beds[i]->x, "bed%d", i);
+                mvprintw(resources[i]->y, resources[i]->x, "%s",
+                         resources[i]->name.c_str());
+            }
+            refresh();
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
 }
 
@@ -140,9 +152,9 @@ int main() {
 
     init_scr();
     house_setup();
-    print_house();
 
-    std::thread clock_thread = std::thread(time_flows, 100);
+    std::thread print_house_thread = std::thread(print_house);
+    std::thread clock_thread = std::thread(time_flows, 50);
     std::thread ppl_threads[5];
 
     for (int i = 0; i < 5; i++){
@@ -152,6 +164,7 @@ int main() {
 
     std::thread(stop_all).join();
 
+    print_house_thread.join();
     clock_thread.join();
     for (int i = 0; i < 5; i++){
         if (ppl_threads[i].joinable())
