@@ -102,12 +102,9 @@ void Person::use(Resource* res, int duration_minutes, std::deque<Person*> * queu
                 
                 state = idle;
                 resource_used = nullptr;
-                {
-                    //std::scoped_lock l(res->resmutex);
-                    queue->erase(std::find(queue->begin(), queue->end(), this));
-                    move_line(res, queue);
-                    res->used_by--;
-                }
+                queue->erase(std::find(queue->begin(), queue->end(), this));
+                move_line(res, queue);
+                res->used_by--;
                 res->rescondition.notify_all();
                 if (locked == true){
                     {

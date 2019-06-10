@@ -134,6 +134,7 @@ int main() {
 
     for (int i = 0; i < 5; i++){
         ppl_threads[i] = std::thread(live_a_life, persons[i]);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     std::thread(stop_all).join();
