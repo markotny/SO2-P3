@@ -8,10 +8,30 @@
 
 void Person::sleep(){
     move_to_resource_used(1);
-    //wait until the morning...
+    state = sleeping;
+    print_state("sleeping");
+    int wake_up = 60 * (360 + std::rand() % 120); // wake up between 6 and 8
+    while (main_clock->hour >= 22 || main_clock->now() < wake_up){
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    state = idle;
+    resource_used = nullptr;
+    used_kitchen = false;
+}
+
+void wait_until_avaible(Resource * res){
+    res->lock = true;
+    while (res->used_by > 0){
+        std::unique_lock lk(res->resmutex);
+        res->rescondition.wait(lk, [res] {
+            return res->used_by == 0;
+        });
+        lk.unlock();
+    }
 }
 
 void Person::use(Resource* res, int duration_minutes, std::deque<Person*> * queue){
+    queue->push_back(this);
     resource_used = res;
     state = moving;
     print_state("moving to " + res->name);
@@ -20,18 +40,38 @@ void Person::use(Resource* res, int duration_minutes, std::deque<Person*> * queu
 
     state = waiting;
 
-    while (res->used_by >= res->capacity){
-        print_state ("waiting for " + res->name);
-        // lock on the resource
+    std::thread wait_for_req;
+    bool locked = false;
+    if (res->res_required != nullptr && res->res_required->lock == false){
+        wait_for_req = std::thread(wait_until_avaible, res->res_required);
+        locked = true;
+    }
 
+    print_state ("waiting for " + res->name);
+    
+    while (res->used_by >= res->capacity || res->lock == true){
         std::unique_lock lk(res->resmutex);
         res->rescondition.wait(lk, [res] {
-            return res->used_by < res->capacity; //wait until next guy moves
+            return res->used_by < res->capacity && res->lock == false;
         });
         lk.unlock();
     }
 
-    print_state("using " + res->name + " 0%");
+    if (res->res_required != nullptr){
+        Resource * req = res->res_required;
+        print_state ("can use " + res->name + ", waiting for " + req->name);
+        if (locked == true)
+            if (wait_for_req.joinable()) wait_for_req.join();
+
+        else if (req->used_by > 0) {
+            std::unique_lock lk(req->resmutex);
+            req->rescondition.wait(lk, [req] {
+                return req->used_by == 0;
+            });
+            lk.unlock();
+        }
+    }
+
     state = using_resource;
     res->used_by++;
     
@@ -44,11 +84,16 @@ void Person::use(Resource* res, int duration_minutes, std::deque<Person*> * queu
             refresh();
         }
         print_state("using " + res->name + " - " + std::to_string(int(100 * progress)) + "%");
-        progress = static_cast<float>(main_clock->now() - start) / (duration_minutes * 60);
+
+        int elapsed = main_clock->now() - start;
+        if (elapsed < 0)
+            elapsed = 86400 - elapsed;  // 86400 = 24 * 60 * 60 -> whole day
+
+        progress = static_cast<float>(elapsed) / (duration_minutes * 60);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     } while (progress < 1.0);
     {
-        std::scoped_lock lk(permutex, res->resmutex);
+        std::scoped_lock lk(res->resmutex);
         state = idle;
         resource_used = nullptr;
         int i = 0;
@@ -58,13 +103,21 @@ void Person::use(Resource* res, int duration_minutes, std::deque<Person*> * queu
         }
         queue->erase(queue->begin() + i);
         for (; i < queue->size(); i++){
-            queue->at(i)->move_in_line();
+            Person * p = queue->at(i);
+            if (p->state == moving)
+                p->dest_x += 2;
+            else
+                queue->at(i)->move_in_line();
         }
         res->used_by--;
-        reprint(x, y, x, y - 1);
-        y -= 1;
     }
-    percondition.notify_all();
+    if (locked == true){
+        {
+            std::scoped_lock lk(res->res_required->resmutex);
+            res->res_required->lock = false;
+        }
+        res->res_required->rescondition.notify_all();
+    }
     res->rescondition.notify_all();
 }
 
@@ -87,7 +140,7 @@ void Person::keep_on_movin(){
         reprint(x, y, xn, yn);
         x = xn;
         y = yn;
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
         steps_left--;
     }
     reprint(x, y, dest_x, dest_y);

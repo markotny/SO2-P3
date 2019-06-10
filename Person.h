@@ -9,7 +9,8 @@ enum pstate {
     waiting,
     using_resource,
     idle,
-    moving
+    moving,
+    sleeping
 };
 
 class Person {
@@ -40,7 +41,7 @@ public:
     void sleep();
     void use(Resource* res, int minutes, std::deque<Person*> * queue);
     void move_in_line();
-    
+
 private:
     int steps_all, steps_left, start_x, start_y, dest_x, dest_y, vec_x, vec_y;
     void move_to_resource_used(int queue_size);

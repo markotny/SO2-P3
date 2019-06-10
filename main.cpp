@@ -15,11 +15,10 @@ int terminal_height;
 std::mutex print_mutex;
 bool cancel = false;
 
-Resource* beds[5], *kitchen, *bathroom, *computer, *tv, *console;
+Resource* beds[5];
 Person* persons[5];
 Resource* resources[5];
 std::deque<Person*> *queue[5];   // queue for each resource
-Person* children[3];
 
 Clock* main_clock;
 
@@ -66,18 +65,16 @@ void live_a_life(Person* person){
             }
             person->sleep();
             LOG(INFO) << main_clock->print_time() << person->name << " woke up" << std::endl;
-            
 
         } else if (main_clock->hour >= 13 && main_clock->hour <= 18 && !person->used_kitchen){
-            queue[0]->push_back(person);
             LOG(INFO) << main_clock->print_time() << person->name << " going to kitchen" << std::endl;
 
-            person->use(kitchen, 60 + std::rand() % 60, queue[0]);
+            person->use(resources[0], 60 + std::rand() % 60, queue[0]);
             person->used_kitchen = true;
             LOG(INFO) << main_clock->print_time() << person->name << " done with kitchen" << std::endl;
         } else {
-            int res = std::rand() % 4 + 1;
-            queue[res]->push_back(person);
+            int res = std::rand() % 4 + 1; // rand without kitchen
+            
             LOG(INFO) << main_clock->print_time() << person->name << " going for resource " << res << std::endl;
             person->use(resources[res], 60 + std::rand() % 120, queue[res]);
             LOG(INFO) << main_clock->print_time() << person->name << " done with resource " << res << std::endl;
@@ -100,22 +97,11 @@ void house_setup(){
         queue[i] = new std::deque<Person*>();
     }
 
-    kitchen = new Resource("kitchen", 50, 1, 2);
-    bathroom = new Resource("bathroom", 20, 3);
-    computer = new Resource("computer", 60, 7);
-    tv = new Resource("tv", 30, 10, 3);
-    console = new Resource("console", 30, 12, 2);
-
-    resources[0] = kitchen;
-    resources[1] = bathroom;
-    resources[2] = computer;
-    resources[3] = tv;
-    resources[4] = console;
-
-    children[0] = persons[2];
-    children[1] = persons[3];
-    children[2] = persons[4];
-
+    resources[0] = new Resource("kitchen", 50, 1, 2);
+    resources[1] = new Resource("bathroom", 20, 3);
+    resources[2] = new Resource("computer", 60, 7);
+    resources[3] = new Resource("tv", 30, 10, 3);
+    resources[4] = new Resource("console", 30, 12, 2, 2, resources[3]);
 }
 
 void print_house(){
