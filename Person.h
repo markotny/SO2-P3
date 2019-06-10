@@ -19,7 +19,7 @@ public:
     pstate state;
     Resource* resource_used;
     bool used_kitchen;
-    int x,y, dest_x, dest_y, state_line;
+    int x,y, dest_x, dest_y, state_line, res_using_duration;
 
     Clock* main_clock;
     std::mutex permutex;
@@ -33,8 +33,8 @@ public:
         print_mutex = pm;
         state = idle;
         used_kitchen = false;
-        x = 20;
-        y = 5;
+        x = 20 + std::rand() % 20;
+        y = 1 + std::rand() % 9;
     }
 
     //void move(dest_x, dest_y);

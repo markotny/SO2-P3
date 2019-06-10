@@ -4,10 +4,6 @@
 #include <mutex>
 #include <thread>
 #include "Person.h"
-#include "easylogging++.h"
-
-INITIALIZE_EASYLOGGINGPP
-#define ELPP_THREAD_SAFE
 
 int terminal_width;
 int terminal_height;
@@ -28,14 +24,15 @@ void init_scr() {
     timeout(-1);  // blocking getch()
 
     getmaxyx(stdscr, terminal_height, terminal_width);
-    LOG(INFO) << "Started on terminal width x height: " << terminal_width
-              << " x " << terminal_height;
 }
 
-void time_flows(int interval_ms){
+void the_time_is_now(int interval_ms){
     while(!cancel){
         std::scoped_lock lk(main_clock->clk_mutex);
-        main_clock->jump_in_time(60);
+        if (main_clock->hour > 6)
+            main_clock->jump_in_time(60);
+        else
+            main_clock->jump_in_time(180);
         {
             std::scoped_lock loc(print_mutex);
             mvprintw(1, 80, "Time: %s", main_clock->print_time().c_str());
@@ -47,37 +44,33 @@ void time_flows(int interval_ms){
 
 void stop_all() {
     getch();
-
-    LOG(INFO) << "stopping...";
     cancel = true;
 }
 
 void live_a_life(Person* person){
     while(!cancel){
+        int prev_res = 0;
         if (main_clock->hour >= 22 || main_clock->hour < 6){
             for (int i = 0; i < 5; i++){
                 if (beds[i]->used_by == 0){
                     person->resource_used = beds[i];
-                    beds[i]->used_by++;
-                    LOG(INFO) << person->name << "going to bed " << i << std::endl;
                     break;
                 }
             }
             person->sleep();
-            LOG(INFO) << main_clock->print_time() << person->name << " woke up" << std::endl;
 
         } else if (main_clock->hour >= 13 && main_clock->hour <= 18 && !person->used_kitchen){
-            LOG(INFO) << main_clock->print_time() << person->name << " going to kitchen" << std::endl;
 
             person->use(resources[0], 60 + std::rand() % 60, queue[0]);
             person->used_kitchen = true;
-            LOG(INFO) << main_clock->print_time() << person->name << " done with kitchen" << std::endl;
         } else {
-            int res = std::rand() % 4 + 1; // rand without kitchen
+            int res;
+            do {
+                res = std::rand() % 4 + 1; // rand without kitchen
+            } while (res == prev_res);
+            prev_res = res;
             
-            LOG(INFO) << main_clock->print_time() << person->name << " going for resource " << res << std::endl;
             person->use(resources[res], 60 + std::rand() % 120, queue[res]);
-            LOG(INFO) << main_clock->print_time() << person->name << " done with resource " << res << std::endl;
         }
     }
 }
@@ -131,22 +124,17 @@ void delete_house(){
 
 int main() {
     std::srand(time(NULL));
-    el::Configurations conf("log/easylogging.conf");
-    conf.set(el::Level::Global, el::ConfigurationType::Enabled, "false");
-    
-    el::Loggers::reconfigureLogger("default", conf);
 
     init_scr();
     house_setup();
 
     std::thread print_house_thread = std::thread(print_house);
-    std::thread clock_thread = std::thread(time_flows, 50);
+    std::thread clock_thread = std::thread(the_time_is_now, 50);
     std::thread ppl_threads[5];
 
     for (int i = 0; i < 5; i++){
         ppl_threads[i] = std::thread(live_a_life, persons[i]);
     }
-    LOG(INFO) << "Started all threads.\n";
 
     std::thread(stop_all).join();
 

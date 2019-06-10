@@ -4,10 +4,10 @@
 #include <thread>
 #include <iostream>
 #include <algorithm>
-#include "easylogging++.h"
 
 
 void Person::sleep(){
+    resource_used->used_by++;
     move_to_resource_used(1);
     state = sleeping;
     print_state("sleeping");
@@ -16,6 +16,7 @@ void Person::sleep(){
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     state = idle;
+    resource_used->used_by--;
     resource_used = nullptr;
     used_kitchen = false;
 }
@@ -47,6 +48,7 @@ void wait_until_avaible(Resource * res){
 void Person::use(Resource* res, int duration_minutes, std::deque<Person*> * queue){
     queue->push_back(this);
     resource_used = res;
+    res_using_duration = duration_minutes;
     state = moving;
     print_state("moving to " + res->name);
 
@@ -63,9 +65,9 @@ void Person::use(Resource* res, int duration_minutes, std::deque<Person*> * queu
 
     print_state ("waiting for " + res->name);
     
-    while (res->used_by >= res->capacity || res->lock == true){
+    if (res->used_by >= res->capacity || res->lock == true){
         std::unique_lock lk(res->resmutex);
-        res->rescondition.wait(lk, [res] {
+        res->rescondition.wait(lk, [res, this] {
             return res->used_by < res->capacity && res->lock == false;
         });
         lk.unlock();
@@ -88,6 +90,45 @@ void Person::use(Resource* res, int duration_minutes, std::deque<Person*> * queu
 
     state = using_resource;
     res->used_by++;
+    res->rescondition.notify_all();
+    if (res->min_required > 1){
+        if (res->used_by < res->min_required){
+            print_state ("can use " + res->name + ", waiting for more people");
+            std::unique_lock lk(res->resmutex);
+            if ( !res->rescondition.wait_for(lk, std::chrono::seconds(10), [res] {
+                    return res->used_by == res->min_required;})
+                ){
+                print_state ("aborting - not enough people to use " + res->name);
+                
+                state = idle;
+                resource_used = nullptr;
+                {
+                    //std::scoped_lock l(res->resmutex);
+                    queue->erase(std::find(queue->begin(), queue->end(), this));
+                    move_line(res, queue);
+                    res->used_by--;
+                }
+                res->rescondition.notify_all();
+                if (locked == true){
+                    {
+                        std::scoped_lock lk(res->res_required->resmutex);
+                        res->res_required->lock = false;
+                    }
+                    res->res_required->rescondition.notify_all();
+                }
+                lk.unlock();
+                return;
+            }
+            lk.unlock();
+        }
+        for (int i = 0; i < queue->size(); i++){
+            Person * p = queue->at(i);
+            if (p->state == using_resource){
+                std::scoped_lock lk(p->permutex);
+                p->res_using_duration = this->res_using_duration;
+            }
+        }
+    }
     
     int start = main_clock->now();
     float progress = 0.0;
@@ -103,14 +144,13 @@ void Person::use(Resource* res, int duration_minutes, std::deque<Person*> * queu
         if (elapsed < 0)
             elapsed = 86400 - elapsed;  // 86400 = 24 * 60 * 60 -> whole day
 
-        progress = static_cast<float>(elapsed) / (duration_minutes * 60);
+        progress = static_cast<float>(elapsed) / (res_using_duration * 60);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     } while (progress < 1.0);
     {
         std::scoped_lock lk(res->resmutex);
         state = idle;
         resource_used = nullptr;
-        int i = 0;
         queue->erase(std::find(queue->begin(), queue->end(), this));
         move_line(res, queue);
         res->used_by--;
