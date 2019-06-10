@@ -97,7 +97,7 @@ void house_setup(){
     resources[4] = new Resource("console", 30, 12, 2, 2, resources[3]);
 }
 
-void print_house(){
+void reprint(){
     while (!cancel) {
         {
             std::scoped_lock lk(print_mutex);
@@ -105,6 +105,10 @@ void print_house(){
                 mvprintw(beds[i]->y, beds[i]->x, "bed%d", i);
                 mvprintw(resources[i]->y, resources[i]->x, "%s",
                          resources[i]->name.c_str());
+
+                if (persons[i]->state == waiting)
+                    mvprintw(persons[i]->y, persons[i]->x, "%c",
+                             persons[i]->name.c_str()[0]);
             }
             refresh();
         }
@@ -128,7 +132,7 @@ int main() {
     init_scr();
     house_setup();
 
-    std::thread print_house_thread = std::thread(print_house);
+    std::thread reprint_thread = std::thread(reprint);
     std::thread clock_thread = std::thread(the_time_is_now, 50);
     std::thread ppl_threads[5];
 
@@ -139,7 +143,7 @@ int main() {
 
     std::thread(stop_all).join();
 
-    print_house_thread.join();
+    reprint_thread.join();
     clock_thread.join();
     for (int i = 0; i < 5; i++){
         if (ppl_threads[i].joinable())

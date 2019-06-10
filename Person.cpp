@@ -8,6 +8,7 @@
 
 void Person::sleep(){
     resource_used->used_by++;
+    print_state("going to bed");
     move_to_resource_used(1);
     state = sleeping;
     print_state("sleeping");

@@ -37,7 +37,6 @@ public:
         y = 1 + std::rand() % 9;
     }
 
-    //void move(dest_x, dest_y);
     void sleep();
     void use(Resource* res, int minutes, std::deque<Person*> * queue);
     void reprint(int x_old, int y_old, int x_new, int y_new);
