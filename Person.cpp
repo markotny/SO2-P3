@@ -3,6 +3,7 @@
 #include <ncurses.h>
 #include <thread>
 #include <iostream>
+#include <algorithm>
 #include "easylogging++.h"
 
 
@@ -17,6 +18,19 @@ void Person::sleep(){
     state = idle;
     resource_used = nullptr;
     used_kitchen = false;
+}
+
+void move_line(Resource * res, std::deque<Person*> * queue){
+    for (int i = 0; i < queue->size(); i++){
+        Person * p = queue->at(i);
+        std::scoped_lock lk(p->permutex);
+        if (p->state == moving) {
+            p->dest_x = res->x - 2 * (i + 1);
+        } else {
+            p->reprint(p->x, p->y, res->x - 2 * (i + 1), p->y);
+            p->x = res->x - 2 * (i + 1);
+        }
+    }
 }
 
 void wait_until_avaible(Resource * res){
@@ -97,18 +111,8 @@ void Person::use(Resource* res, int duration_minutes, std::deque<Person*> * queu
         state = idle;
         resource_used = nullptr;
         int i = 0;
-        for (; i < queue->size(); i++){
-            if (queue->at(i) == this)
-                break;
-        }
-        queue->erase(queue->begin() + i);
-        for (; i < queue->size(); i++){
-            Person * p = queue->at(i);
-            if (p->state == moving)
-                p->dest_x += 2;
-            else
-                queue->at(i)->move_in_line();
-        }
+        queue->erase(std::find(queue->begin(), queue->end(), this));
+        move_line(res, queue);
         res->used_by--;
     }
     if (locked == true){
@@ -146,11 +150,6 @@ void Person::keep_on_movin(){
     reprint(x, y, dest_x, dest_y);
     x = dest_x;
     y = dest_y;
-}
-
-void Person::move_in_line(){
-    reprint(x, y, x + 2, y);
-    x += 2;
 }
 
 void Person::reprint(int x_old, int y_old, int x_new, int y_new){

@@ -19,7 +19,7 @@ public:
     pstate state;
     Resource* resource_used;
     bool used_kitchen;
-    int x,y, state_line;
+    int x,y, dest_x, dest_y, state_line;
 
     Clock* main_clock;
     std::mutex permutex;
@@ -40,12 +40,11 @@ public:
     //void move(dest_x, dest_y);
     void sleep();
     void use(Resource* res, int minutes, std::deque<Person*> * queue);
-    void move_in_line();
+    void reprint(int x_old, int y_old, int x_new, int y_new);
 
 private:
-    int steps_all, steps_left, start_x, start_y, dest_x, dest_y, vec_x, vec_y;
+    int steps_all, steps_left, start_x, start_y, vec_x, vec_y;
     void move_to_resource_used(int queue_size);
     void keep_on_movin();
-    void reprint(int x_old, int y_old, int x_new, int y_new);
     void print_state(std::string state);
 };
